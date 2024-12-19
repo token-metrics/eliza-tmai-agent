@@ -3,7 +3,8 @@
     "modelProvider": "openai",
     "clients": [
         "TWITTER",
-        "DIRECT"
+        "DIRECT",
+        "AUTO"
     ],
     "settings": {
         "secrets": {},

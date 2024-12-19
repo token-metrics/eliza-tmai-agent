@@ -15,6 +15,8 @@ import { generateTweetActions } from "@ai16z/eliza";
 import { IImageDescriptionService, ServiceType } from "@ai16z/eliza";
 import { buildConversationThread } from "./utils.ts";
 import { twitterMessageHandlerTemplate } from "./interactions.ts";
+import { SnowflakeService, SnowflakeConfig } from "./services/snowflakeService";
+import { DataAnalysisService, TokenMetrics } from "./services/dataAnalysisService";
 
 const twitterPostTemplate = `
 # Areas of Expertise
@@ -100,6 +102,8 @@ export class TwitterPostClient {
     private isProcessing: boolean = false;
     private lastProcessTime: number = 0;
     private stopProcessingActions: boolean = false;
+    private snowflakeService: SnowflakeService;
+    private dataAnalysisService: DataAnalysisService;
 
 
     async start(postImmediately: boolean = false) {
@@ -192,23 +196,32 @@ export class TwitterPostClient {
         this.client = client;
         this.runtime = runtime;
         this.twitterUsername = runtime.getSetting("TWITTER_USERNAME");
+
+        // Initialize services
+        const snowflakeConfig: SnowflakeConfig = {
+            account: runtime.getSetting("SNOWFLAKE_ACCOUNT"),
+            username: runtime.getSetting("SNOWFLAKE_USERNAME"),
+            password: runtime.getSetting("SNOWFLAKE_PASSWORD"),
+            database: runtime.getSetting("SNOWFLAKE_DATABASE"),
+            schema: runtime.getSetting("SNOWFLAKE_SCHEMA"),
+            warehouse: runtime.getSetting("SNOWFLAKE_WAREHOUSE")
+        };
+
+        this.snowflakeService = new SnowflakeService(snowflakeConfig);
+        this.dataAnalysisService = new DataAnalysisService();
     }
 
     private async generateNewTweet() {
         elizaLogger.log("Generating new tweet");
 
         try {
+            // Generate data-driven content
+            const dataDrivenContent = await this.generateDataDrivenTweet();
+
+            // Use the existing tweet generation logic with the data-driven content
             const roomId = stringToUuid(
                 "twitter_generate_room-" + this.client.profile.username
             );
-            await this.runtime.ensureUserExists(
-                this.runtime.agentId,
-                this.client.profile.username,
-                this.runtime.character.name,
-                "twitter"
-            );
-
-            const topics = this.runtime.character.topics.join(", ");
 
             const state = await this.runtime.composeState(
                 {
@@ -216,7 +229,7 @@ export class TwitterPostClient {
                     roomId: roomId,
                     agentId: this.runtime.agentId,
                     content: {
-                        text: topics || '',
+                        text: dataDrivenContent,
                         action: "TWEET",
                     },
                 },
@@ -755,5 +768,88 @@ export class TwitterPostClient {
 
     async stop() {
         this.stopProcessingActions = true;
+    }
+
+    private async generateDataDrivenTweet(): Promise<string> {
+        try {
+            // Fetch token metrics data
+            const tokenData = await this.snowflakeService.getTokenMetrics();
+
+            // Analyze the data
+            // const analysis = this.dataAnalysisService.analyzeTokenData(tokenData);
+
+            // Create a prompt for the LLM
+            const prompt = `
+            You are TM-AI-Agent, a crypto twitter bot which posts regular updates about crypto markets, news, analysis etc.
+            Create a short tweet considering the data below:
+            ${JSON.stringify(tokenData, null, 2)}
+
+            ## Instructions
+            Write in the style of a professional yet relatable Crypto Twitter insider with INTJ-level strategic depth. Posts should deliver actionable alpha for traders and investors, balancing short-term opportunities with long-term plays.
+            Each tweet must:
+            - Be Substantiated by Data: Include specific metrics, indicators, or evidence to support claims, such as TVL, growth rates, funding activity, or historical trends.
+            - Demonstrate Strategic Depth: Go beyond surface-level takes to showcase second-level thinking, considering long-term narratives and broader market forces.
+            - Provide Clear Calls to Action: Include actionable insights, such as specific tokens, projects, or frameworks for decision-making.
+            - Avoid Hype: Stay grounded, avoiding over-reliance on speculative narratives or generic ideas without evidence.
+            - Incorporate Personality: Maintain a confident, approachable tone that balances professional insight with engaging language—smart, direct, and relatable.
+            - Every answer should provide clarity, depth, and tangible opportunities while maintaining relevance to market conditions.
+            - Do not include hashtags at all, use cashtags for token names.
+            - Always formulate the answer in less than 280 characters for twitter.
+            Here are 10 examples of tweets:
+            1. "ETH staking has grown to $42B TVL, but decentralization matters. Rocket Pool ($ROCKET) offers ~4.3% APY with less regulatory risk, while Obol is innovating distributed validator tech. Balance yields with resilience—don’t overconcentrate in Lido. :shield::gem:"
+            2. "Bitcoin is at $100K, but miners are the lagging alpha. $RIOT and $MARA historically rally 2-3 weeks after BTC pumps. Key signal: BTC DEVuction costs (~$20K). Miners with high hashrate efficiency often double in these conditions. :hammer_and_pick::chart_with_upwards_trend:"
+            3. "zkEVM is hyped, but dev infra is where value sticks. $SAFE secures 40% of DAO multi-sigs, and EigenLayer ($EIGEN) is redefining data availability with $50M backing. Builders need tools—follow the funding and activity metrics. :hammer_and_wrench::rocket:"
+            4. "NFTs are evolving: utility > hype. Boson Protocol ($BOSON) is bridging Web3 and real-world brands, facilitating over $10M in marketplace transactions. $ETH and $AVAX are the tech backbones for enterprise adoption. The next wave isn’t PFPs—it’s utility. :brain::sparkles:"
+            5. "DeFi is back, and real yield is the name of the game. $GMX generated $130M in fees this year, rewarding stakers sustainably. $GNS (copy trading) and $VELA (perps) are next-gen fee models to watch. Focus on protocols generating consistent revenue. :bank::moneybag:"
+            6. "Solana ($SOL) is more than its token—its an ecosystem. $MANGO is leading DeFi with $25M+ daily volume, while $JUP drives liquidity with 200% user growth this quarter. Track TVL increases and active users for hidden Solana gems. :sunrise::fire:"
+            7. "As regulators target $USDT and $USDC, decentralized stablecoins like $RAI and Frax ($FRAX) are gaining momentum. $RAI’s non-pegged model and $FRAX’s hybrid design offer censorship resistance and lower systemic risk. Hedge your portfolio early. :seedling::chains:"
+            8. "AI x blockchain isnt just hype—its infrastructure. Akash ($AKT) processes 10K+ decentralized workloads daily, and Ocean Protocol ($OCEAN) leads data markets with $25M+ staked. Verified, decentralized compute is critical for scalable AI. :brain::robot_face:"
+            9. "BTC dominance nearing 50% signals altcoin rotations. Historically, $DOT and $ATOM outperform in these cycles, with $ATOM up 60% post-dominance peaks. Key triggers: funding rate flips (negative to positive) and sentiment spikes. :mantelpiece_clock::gem:"
+            10. "Bear markets are for positioning. Middleware projects like Axelar ($AXL) handle $2B+ in cross-chain liquidity, while EigenLayer ($EIGEN) is building the backbone for modular scaling. Execution > hype—invest in infrastructure while its undervalued. :tractor::package:"
+            Why These Examples Work:
+            - Substantiated by Data: Every example includes metrics, trends, or historical references to validate the insights (e.g., TVL, hashrate efficiency, transaction volumes).
+            - Strategic Depth: Goes beyond the obvious, offering second-order thinking about ecosystems, infrastructure, and emerging narratives.
+            - Actionable: Provides clear tokens, signals, or metrics to research and act upon.
+            - Avoids Hype: Focuses on sustainable, data-backed trends rather than speculative narratives.
+            - Engaging Tone: Smart, professional, but approachable and clear for traders and investors.
+            Never select token names on your own.
+            Only use the provided data.
+            `;
+
+            // Generate tweet using LLM
+            const context = composeContext({
+                state: {
+                    userId: this.runtime.agentId,
+                    roomId: stringToUuid("twitter_generate_room-" + this.client.profile.username),
+                    agentId: this.runtime.agentId,
+                    content: {
+                        text: prompt,
+                        action: "GENERATE_TWEET"
+                    }
+                },
+                template: prompt
+            });
+
+            const generatedTweet = await generateText({
+                runtime: this.runtime,
+                context,
+                modelClass: ModelClass.SMALL
+            });
+
+            // Clean up the generated tweet
+            const cleanedTweet = generatedTweet
+                .replace(/```json\s*|\s*```/g, '')  // Remove JSON markers
+                .replace(/^['"](.*)['"]$/g, '$1')   // Remove quotes
+                .replace(/\\n/g, '\n')              // Handle newlines
+                .trim();
+
+            elizaLogger.debug('Generated tweet:', cleanedTweet);
+
+            return cleanedTweet;
+
+        } catch (error) {
+            elizaLogger.error('Error generating data-driven tweet:', error);
+            throw error;
+        }
     }
 }

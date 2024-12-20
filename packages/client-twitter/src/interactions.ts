@@ -479,9 +479,18 @@ export class TwitterInteractionClient {
         const sqlQueryContext = composeContext({
             state,
             template: `
-            Use the following table schema to query the database.
+            Recent interactions between {{agentName}} and other users:
+            {{recentPostInteractions}}
 
-    Using the following table schema, generate ONLY a SQL query. Nothing else. Do not give any additional information. Your output should only be a SQL query for snowflake.
+            {{recentPosts}}
+
+            Current Post:
+            {{currentPost}}
+
+            Thread of Tweets You Are Replying To:
+            {{formattedConversation}}
+
+            # Task: Using the following table schema, generate ONLY a SQL query. Nothing else. Do not give any additional information. Your output should only be a SQL query for snowflake. while using the thread of tweets as additional context:
 
     Always use LOWER(TOKEN_NAME) in the WHERE clause.
     </instructions>

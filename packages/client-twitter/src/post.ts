@@ -216,42 +216,7 @@ export class TwitterPostClient {
 
         try {
             // Generate data-driven content
-            const dataDrivenContent = await this.generateDataDrivenTweet();
-
-            // Use the existing tweet generation logic with the data-driven content
-            const roomId = stringToUuid(
-                "twitter_generate_room-" + this.client.profile.username
-            );
-
-            const state = await this.runtime.composeState(
-                {
-                    userId: this.runtime.agentId,
-                    roomId: roomId,
-                    agentId: this.runtime.agentId,
-                    content: {
-                        text: dataDrivenContent,
-                        action: "TWEET",
-                    },
-                },
-                {
-                    twitterUserName: this.client.profile.username,
-                }
-            );
-
-            const context = composeContext({
-                state,
-                template:
-                    this.runtime.character.templates?.twitterPostTemplate ||
-                    twitterPostTemplate,
-            });
-
-            elizaLogger.debug("generate post prompt:\n" + context);
-
-            const newTweetContent = await generateText({
-                runtime: this.runtime,
-                context,
-                modelClass: ModelClass.SMALL,
-            });
+            const newTweetContent = await this.generateDataDrivenTweet();
 
             // First attempt to clean content
             let cleanedContent = '';
@@ -816,24 +781,34 @@ export class TwitterPostClient {
             Only use the provided data.
             `;
 
-            // Generate tweet using LLM
-            const context = composeContext({
-                state: {
+            const roomId = stringToUuid(
+                "twitter_generate_room-" + this.client.profile.username
+            );
+
+            const state = await this.runtime.composeState(
+                {
                     userId: this.runtime.agentId,
-                    roomId: stringToUuid("twitter_generate_room-" + this.client.profile.username),
+                    roomId: roomId,
                     agentId: this.runtime.agentId,
                     content: {
                         text: prompt,
-                        action: "GENERATE_TWEET"
-                    }
+                        action: "TWEET",
+                    },
                 },
-                template: prompt
+                {
+                    twitterUserName: this.client.profile.username,
+                }
+            );
+
+            // Generate tweet using LLM
+            const context = composeContext({
+                state
             });
 
             const generatedTweet = await generateText({
                 runtime: this.runtime,
                 context,
-                modelClass: ModelClass.SMALL
+                modelClass: ModelClass.LARGE
             });
 
             // Clean up the generated tweet

@@ -27,6 +27,7 @@ tweets/
 *.mp3
 
 logs/
+agent/snowflake.log
 
 test-report.json
 content_cache/

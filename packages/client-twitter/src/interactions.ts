@@ -596,6 +596,7 @@ export class TwitterInteractionClient {
         - For 100x token, also give the VALUATION_METRICS.
         - ALways search the Snowflake table with lower case for all string values such as TOKEN_NAME, TOKEN_SYMBOL, JSON column key's etc. For example, SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW WHERE LOWER(TOKEN_NAME)= LOWER('QuantixAI').
         - If user question or conversation history has refers to the token in all capital letters, then use TOKEN_SYMBOL in SELECT.
+        - Only return the SQL query, no extra text or headers or commas or any other formatting including back ticks or any other characters.
         </rules>
             `,
         });

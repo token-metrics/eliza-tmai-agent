@@ -802,7 +802,8 @@ export class TwitterPostClient {
 
             // Generate tweet using LLM
             const context = composeContext({
-                state
+                state,
+                template: twitterPostTemplate
             });
 
             const generatedTweet = await generateText({

@@ -492,8 +492,7 @@ export class TwitterInteractionClient {
 
             # Task: Using the following table schema, generate ONLY a SQL query. Nothing else. Do not give any additional information. Your output should only be a SQL query for snowflake. while using the thread of tweets as additional context:
 
-    Always use LOWER(TOKEN_NAME) in the WHERE clause.
-    </instructions>
+        Always use LOWER(TOKEN_NAME) in the WHERE clause.
         <table_schema>
         create or replace TABLE TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW (
             DATE DATE 'YYYY-MM-DD',

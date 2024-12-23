@@ -21,7 +21,8 @@ import { buildConversationThread, sendTweet, wait } from "./utils.ts";
 import { SnowflakeConfig } from "./services/snowflakeService.ts";
 import { SnowflakeService } from "./services/snowflakeService.ts";
 
-export const twitterMessageHandlerTemplate = (data: any) => `
+export const twitterMessageHandlerTemplate = (data: any) =>
+    `
 # Areas of Expertise
 {{knowledge}}
 
@@ -51,7 +52,7 @@ Thread of Tweets You Are Replying To:
 Keeping in mind the Current Post, and the thread of tweets, generate a suitable response using the data given below:
 Remember to adhere to the instruction, personality style, rules etc which you have been provided. Only use the data below to formulate an answer:
 <data>
-    ${data}
+    ${JSON.stringify(data)}
 </data>
 
 Rules:
@@ -147,7 +148,7 @@ export class TwitterInteractionClient {
             password: runtime.getSetting("SNOWFLAKE_PASSWORD"),
             database: runtime.getSetting("SNOWFLAKE_DATABASE"),
             schema: runtime.getSetting("SNOWFLAKE_SCHEMA"),
-            warehouse: runtime.getSetting("SNOWFLAKE_WAREHOUSE")
+            warehouse: runtime.getSetting("SNOWFLAKE_WAREHOUSE"),
         };
 
         this.snowflakeService = new SnowflakeService(snowflakeConfig);
@@ -565,12 +566,28 @@ export class TwitterInteractionClient {
                     ORDER BY TM_INVESTOR_GRADE DESC NULLS LAST, VOLUME_24H DESC NULLS LAST
                     LIMIT 1;
         </example>
+        <example>
+        Question: What about zerebro?
+        Output: SELECT TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_INVESTOR_GRADE, VALUATION_METRICS, FUNDAMENTAL_GRADE, TECHNOLOGY_GRADE, VALUATION_GRADE, SUMMARY
+                    FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
+                    WHERE LOWER(TOKEN_NAME) = LOWER('ZereBro')
+                    LIMIT 1;
+        </example>
+        <example>
+        Question: What about $LTC?
+        Output: SELECT TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_INVESTOR_GRADE, VALUATION_METRICS, FUNDAMENTAL_GRADE, TECHNOLOGY_GRADE, VALUATION_GRADE, SUMMARY
+                    FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
+                    WHERE LOWER(TOKEN_SYMBOL) = LOWER('LTC')
+                    LIMIT 1;
+        </example>
 
         <rules>
         To generate the correct Snowflake SQL query, you must follow the rules below:
         Rules:
+        - Only return the SQL query, no other text or information, don't even include "sql" in the query, MUST start with "SELECT"
         - Use both the user question and conversation history to create a SQL query.
-        - Always use token name as default field to select a token by. SELECT * FROM TABLE WHERE TOKEN_NAME=LOWER('Bitcoin')
+        - Always use token name as default field to select a token by.
+        - MUST have to use the user question and conversation history to generate the SQL query.
         - Use the table name without any curly brackets or anything else.
         - If user asks for a single token, then only return a single token. If the user asks for a list of tokens, then limit your results to 10.
         - Always use NULLS LAST in ORDER BY.
@@ -587,22 +604,59 @@ export class TwitterInteractionClient {
         - For 100x token, also give the VALUATION_METRICS.
         - ALways search the Snowflake table with lower case for all string values such as TOKEN_NAME, TOKEN_SYMBOL, JSON column key's etc. For example, SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW WHERE LOWER(TOKEN_NAME)= LOWER('QuantixAI').
         - If user question or conversation history has refers to the token in all capital letters, then use TOKEN_SYMBOL in SELECT.
-        </rules>
+         </rules>
+
+         ## User Question
+        ${JSON.stringify(extractQuestionFromTweet(tweet, thread))}
+
+        ## Conversation Context
+        ${formattedConversation}
             `,
         });
+
+        function extractQuestionFromTweet(
+            tweet: Tweet,
+            thread: Tweet[]
+        ): string {
+            // Remove mentions from the tweet text
+            let question = tweet.text.replace(/@\w+/g, "").trim();
+
+            // If the tweet is very short or seems like a response,
+            // look for context in the conversation thread
+            if (question.length < 10 || question.startsWith("@")) {
+                // Look through thread for context
+                const relevantTweets = thread
+                    .slice(-3) // Look at last 3 tweets for context
+                    .map((t) => t.text.replace(/@\w+/g, "").trim())
+                    .filter((text) => text.length > 0)
+                    .join(" | ");
+
+                question = relevantTweets || question;
+            }
+
+            console.log("Question:", question);
+
+            return question;
+        }
 
         const generatedSqlQuery = await generateText({
             runtime: this.runtime,
             context: sqlQueryContext,
-            modelClass: ModelClass.LARGE
+            modelClass: ModelClass.LARGE,
         });
+
+        console.log("Generated SQL Query:", generatedSqlQuery);
 
         const data = await this.snowflakeService.query(generatedSqlQuery);
 
+        console.log("Data:", data);
+
         const context = composeContext({
             state,
-            template: twitterMessageHandlerTemplate(data)
+            template: twitterMessageHandlerTemplate(data),
         });
+
+        // console.log("Context:", context);
 
         elizaLogger.debug("Interactions prompt:\n" + context);
 

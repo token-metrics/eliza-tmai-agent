@@ -107,8 +107,8 @@ export const generateSQLQueryTemplate = ({
         <example>
         Question: What token should I buy?
         Thought: Token with highest TM Trader Grade
-        Output: SELECT TIMESTAMP, TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_TRADER_GRADE, TRADER_GRADE_SIGNAL, TA_GRADE, QUANT_GRADE
-                    FROM {table_name}
+        Output: SELECT *
+                    FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                     ORDER BY TM_TRADER_GRADE DESC NULLS LAST, VOLUME_24H DESC NULLS LAST
                     LIMIT 1;
         </example>
@@ -116,10 +116,7 @@ export const generateSQLQueryTemplate = ({
         <example>
         Question: Tell me the tokens which are listed on binance exchange.
         Thought: Tokens with Binance in exchange list
-        Output: SELECT
-                    TIMESTAMP, TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, f.value:exchange_name::STRING AS exchange_name
-                FROM
-                    {table_name},
+        Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                     LATERAL FLATTEN(input => exchange_list) f
                 WHERE
                     f.value:exchange_id::STRING = 'binance'
@@ -131,8 +128,7 @@ export const generateSQLQueryTemplate = ({
         <example>
         Question: What is the next 100x token?
         Thought: Token with highest TM Investor Grade
-        Output: SELECT TIMESTAMP, TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_INVESTOR_GRADE, VALUATION_METRICS, FUNDAMENTAL_GRADE, TECHNOLOGY_GRADE, VALUATION_GRADE, SUMMARY
-                    FROM {table_name}
+        Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                     ORDER BY TM_INVESTOR_GRADE DESC NULLS LAST, VOLUME_24H DESC NULLS LAST
                     LIMIT 1;
         </example>
@@ -140,8 +136,7 @@ export const generateSQLQueryTemplate = ({
         <example>
         Question: Give me data about DOGE
         Thought: Get data about the token with symbol DOGE
-        Output: SELECT TIMESTAMP, TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL,MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, VOLUME_24H, MARKET_CAP, MARKET_CAP_RANK, CIRCULATING_SUPPLY, TOTAL_SUPPLY, MAX_SUPPLY, FULLY_DILUTED_VALUATION, HIGH_24H, LOW_24H, PRICE_CHANGE_PERCENTAGE['24h'], PRICE_CHANGE_PERCENTAGE['7d'], PRICE_CHANGE_PERCENTAGE['30d'], SUMMARY
-                  FROM {table_name}
+        Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                   WHERE LOWER(TOKEN_SYMBOL) = LOWER('DOGE')
                   ORDER BY VOLUME_24H DESC NULLS LAST
                   LIMIT 1;
@@ -150,8 +145,7 @@ export const generateSQLQueryTemplate = ({
         <example>
         Question: What is the price of Bitcoin?
         Thought: Get price for Bitcoin
-        Output: SELECT TIMESTAMP, TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE
-                  FROM {table_name}
+        Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                   WHERE LOWER(TOKEN_NAME) = LOWER('Bitcoin')
                   ORDER BY VOLUME_24H DESC NULLS LAST
                   LIMIT 1;
@@ -165,8 +159,7 @@ export const generateSQLQueryTemplate = ({
                 </example>
         <example>
         Question: Give me the top 3 layer one coins according to their price
-        Output: SELECT TOKEN_NAME, TOKEN_SYMBOL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, SUMMARY
-                    FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
+        Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                     WHERE LOWER(CATEGORY_LIST::string) LIKE '%layer%1%' AND CURRENT_PRICE IS NOT NULL
                     ORDER BY CURRENT_PRICE DESC NULLS LAST
                     LIMIT 3;

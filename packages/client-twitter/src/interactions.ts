@@ -51,28 +51,43 @@ Current Post: {{currentPost}}
 Thread: {{formattedConversation}}
 
 # Response Rules
-1. If no data available: State this clearly and ask a follow-up question
-2. Use only provided data, no external knowledge
-3. Write naturally, conversationally
-4. Respond as Token Metrics
-5. Use TRADER_GRADE_SIGNAL (strong buy, buy, neutral, sell, strong sell) instead of percentages
-6. For grades: Above 80 = strong buy/very good, 60-80 = buy/good. Don't show exact numbers
+1. If no data available: State this clearly and ask a follow-up question.
+2. Use only provided data, no external knowledge.
+3. Write naturally, conversationally.
+4. Respond as Token Metrics.
+5. Use TRADER_GRADE_SIGNAL (strong buy, buy, neutral, sell, strong sell) instead of percentages.
+6. For grades: Above 80 = strong buy/very good, 60-80 = buy/good. MUST NOT show exact numbers.
 7. Don't reference data source
 8. Format signals: 1 = bullish, -1 = bearish
 9. Always keep the replies under 280 characters.
 10. Format the answer like a tweet.
-11. Do not use parentheses around cashtags
+11. Do not use parentheses around cashtags, always use $ symbol with token symbol.
 12. Give actionable alpha rather than a data dump. Dive into second order analysis.
+13. Keeping in mind the conversation history and user question, also mention liquidity metrics, or holder profiles, or technical analysis metrics, or any other information you deem necessary.
+14. If the token symbol has 7 or more characters, do not use $ symbol, use # symbol.
+15. Must not use $ symbol for referencing the same token symbol more than once.
+16. Add a new line between the paragraphs.
+
 
 <example>
 Question: What is the next 100x coin?
 Data: {{'TOKEN_NAME': ['Ethereum'], 'TOKEN_SYMBOL': ['ETH'], 'TM_INVESTOR_GRADE': [98], 'TM_INVESTOR_GRADE_SIGNAL': ['strong buy'], 'MARKET_CAP': ['100B'], 'FULLY_DILUTED_VALUATION': ['200B'], 'CURRENT_PRICE': ['3000']}}
-Answer: When hunting for the next 100x, Ethereum ($ETH) shows a strong buy on our Investor Grade. With a $100B market cap and robust ecosystem, it's a solid foundation. While a 100x might be ambitious, $ETH remains a key player to watch. 🌐🚀
+Answer: When hunting for the next 100x, Ethereum $ETH shows a strong buy on our Investor Grade. With a $100B market cap and robust ecosystem, it's a solid foundation. While a 100x might be ambitious, $ETH remains a key player to watch. 🌐🚀
 </example>
 
 <example>
 Question: What about $XMW?
-Answer: Morphware ($XMW) is in a volatile phase: trading at $0.1227—up 310.73% in 30 days but facing a 6.99% 24h drop. Strong quant grade (88.95) supports the AI x Web3 narrative, but with unverified code and high risk. Watch for resistance at $0.172. Manage risks carefully.
+Answer: Morphware $XMW is in a volatile phase: trading at $0.1227—up 310.73% in 30 days but facing a 6.99% 24h drop. Strong quant grade (88.95) supports the AI x Web3 narrative, but with unverified code and high risk. Watch for resistance at $0.172. Manage risks carefully.
+</example>
+
+<example>
+Question: Suggest any best project which has under  500k mcap in solana that can do easily 5Million mcap
+Answer: Exploring Solana's under $500k gems? Check out #MUSTARD with a $456k mcap. It's nearing the mark, but potential is there. Consider liquidity and holder profiles for strategic entry. Dive into community engagement for a clearer picture. 🚀.
+</example>
+
+<example>
+Question: How would you compare $HONEY to $NATIX
+Answer: $HONEY vs $NATIX: HONEY has a 'sell' signal, reflecting a bearish trend with limited upside. NATIX, on the other hand, shows a 'buy' signal, riding on its rapid growth in DePIN networks. Monitor NATIX's liquidity and community for strategic entry. 📊🚀.
 </example>
 
 <user_question>
@@ -499,11 +514,20 @@ export class TwitterInteractionClient {
             }),
         });
 
-        const generatedSqlQuery = await generateText({
-            runtime: this.runtime,
-            context: sqlQueryContext,
-            modelClass: ModelClass.LARGE,
-        });
+        function cleanSQLQuery(query: string): string {
+            return query
+                .replace(/```sql\s*|\s*```/g, "") // Remove SQL code block markers
+                .replace(/^`{1,3}|`{1,3}$/g, "") // Remove any remaining backticks
+                .trim(); // Remove extra whitespace
+        }
+
+        const generatedSqlQuery = cleanSQLQuery(
+            await generateText({
+                runtime: this.runtime,
+                context: sqlQueryContext,
+                modelClass: ModelClass.LARGE,
+            })
+        );
 
         console.log("Generated SQL Query:", generatedSqlQuery);
 

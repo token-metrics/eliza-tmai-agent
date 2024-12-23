@@ -480,9 +480,7 @@ export class TwitterInteractionClient {
         const sqlQueryContext = composeContext({
             state,
             template: `
-            Use the following table schema to query the database.
-
-    Using the following table schema, generate ONLY a SQL query. Nothing else. Do not give any additional information. Your output should only be a SQL query for snowflake.
+            Using the following table schema, generate ONLY a SQL query. Nothing else. Do not give any additional information. Your output should only be a SQL query for snowflake.
 
     Always use LOWER(TOKEN_NAME) in the WHERE clause.
     </instructions>
@@ -495,19 +493,8 @@ export class TwitterInteractionClient {
             TOKEN_URL VARCHAR 'URL to the token details page on Token Metrics',
             PLATFORMS OBJECT 'JSON object listing blockchains on which the token is supported, with corresponding contract addresses' - {{"avalanche": "0x596fa47043f99", "energi": "0x591c19dc0"}}
             "TM_TRADER_GRADE": "TM_TRADER_GRADE FLOAT 'TM Trader Grade (%) our proprietary main grade for short term traders, The higher the more bullish, the lower the more bearish. At 50, we are uncertain about the future price moves. It uses both TA and Quant Grades'",
-            "TM_TRADER_GRADE_24H_PCT_CHANGE": "TM_TRADER_GRADE_24H_PCT_CHANGE FLOAT",
-            "TA_GRADE": "TA_GRADE FLOAT 'Technical Analysis Grade (%) higher means more bullish, lower means more bearish. Around 50 is neutral. It reflects price momentum'",
-            "TA_GRADE_24H_PCT_CHANGE": "TA_GRADE_24H_PCT_CHANGE FLOAT",
-            "QUANT_GRADE": "QUANT_GRADE FLOAT 'Quantitative Grade (%) higher means less risky, lower means more risky. Around 50 is neutral. It reflects risk and volatility'",
-            "QUANT_GRADE_24H_PCT_CHANGE": "QUANT_GRADE_24H_PCT_CHANGE FLOAT",
-            "TM_INVESTOR_GRADE": "TM_INVESTOR_GRADE FLOAT 'TM Investor Grade (0-100) our proprietary main grade for long term investors. The higher the grade, the more 100x potential in long term. The lower, the less long term potential. It uses fundamental, technology, and valuation grades. High fundamentals, high technology, and undervalued tokens get higher values'",
+            "TM_TRADER_GRADE_24H_PCT_CHANGE": "TM_TRADER_GRADE_24H_PCT_CHANGE FLOAT",		            "TM_INVESTOR_GRADE": "TM_INVESTOR_GRADE FLOAT 'TM Investor Grade (0-100) our proprietary main grade for long term investors. The higher the grade, the more 100x potential in long term. The lower, the less long term potential. It uses fundamental, technology, and valuation grades. High fundamentals, high technology, and undervalued tokens get higher values'",
             "TM_INVESTOR_GRADE_7D_PCT_CHANGE": "TM_INVESTOR_GRADE_7D_PCT_CHANGE FLOAT",
-            "FUNDAMENTAL_GRADE": "FUNDAMENTAL_GRADE FLOAT 'Fundamental Grade (%) higher means better fundamentals, tokenomics, team, and adoption'",
-            "FUNDAMENTAL_GRADE_7D_PCT_CHANGE": "FUNDAMENTAL_GRADE_7D_PCT_CHANGE FLOAT",
-            "TECHNOLOGY_GRADE": "TECHNOLOGY_GRADE FLOAT 'Technology Grade (%) higher means better technology, security and robustness'",
-            "TECHNOLOGY_GRADE_7D_PCT_CHANGE": "TECHNOLOGY_GRADE_7D_PCT_CHANGE FLOAT",
-            "VALUATION_GRADE": "VALUATION_GRADE FLOAT 'A higher Valuation Grade (%) means undervalued, low valuation grade means overvalued. Based on similar tokens and age of token'",
-            "VALUATION_GRADE_7D_PCT_CHANGE": "VALUATION_GRADE_7D_PCT_CHANGE FLOAT",
             "DEFI_USAGE_SCORE": "DEFI_USAGE_SCORE FLOAT 'DeFi activity (1-10)",
             "COMMUNITY_SCORE": "COMMUNITY_SCORE FLOAT 'Community (1-10)'",
             "EXCHANGE_SCORE": "EXCHANGE_SCORE FLOAT 'Exchange Listings (1-10)'",
@@ -573,9 +560,10 @@ export class TwitterInteractionClient {
                     WHERE LOWER(TOKEN_NAME) = LOWER('ZereBro')
                     LIMIT 1;
         </example>
+
         <example>
         Question: What about $LTC?
-        Output: SELECT TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_INVESTOR_GRADE, VALUATION_METRICS, FUNDAMENTAL_GRADE, TECHNOLOGY_GRADE, VALUATION_GRADE, SUMMARY
+        Output: SELECT TOKEN_NAME, TOKEN_SYMBOL, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, CURRENT_PRICE, TM_INVESTOR_GRADE, VALUATION_METRICS, SUMMARY
                     FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
                     WHERE LOWER(TOKEN_SYMBOL) = LOWER('LTC')
                     LIMIT 1;
@@ -589,7 +577,7 @@ export class TwitterInteractionClient {
         - Always use token name as default field to select a token by.
         - MUST have to use the user question and conversation history to generate the SQL query.
         - Use the table name without any curly brackets or anything else.
-        - If user asks for a single token, then only return a single token. If the user asks for a list of tokens, then limit your results to 10.
+        - If user asks for a single token, then only return a single token. If the user asks for a list of tokens, then limit your results to 5.
         - Always use NULLS LAST in ORDER BY.
         - Default ORDER BY is VOLUME_24H DESC.
         - Always include columns used in ORDER BY in the SELECT result.
@@ -600,9 +588,8 @@ export class TwitterInteractionClient {
         - For columns with OBJECT datatype, to ensure that the null values inside the JSON structure are removed, always use "STRIP_NULL_VALUE(column_name['key'])" when using ORDER BY, WHERE, or SELECT etc.
         - Always provide name, symbol, TOKEN_URL, MARKET_CAP, FULLY_DILUTED_VALUATION, and CURRENT_PRICE of tokens in the query.
         - Always provide the SUMMARY if only one coin is queried in the SQL query, and if the conversation history does not include a summary or description of the token already.
-        - Given a primary grade such as 'TM_TRADER_GRADE', automatically select its contributory metrics, such as 'TA_GRADE' and 'QUANT_GRADE'. Apply this behavior consistently for other primary grades by identifying and selecting their respective contributory metrics.
         - For 100x token, also give the VALUATION_METRICS.
-        - ALways search the Snowflake table with lower case for all string values such as TOKEN_NAME, TOKEN_SYMBOL, JSON column key's etc. For example, SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW WHERE LOWER(TOKEN_NAME)= LOWER('QuantixAI').
+        - Always search the Snowflake table with lower case for all string values such as TOKEN_NAME, TOKEN_SYMBOL, JSON column key's etc. For example, SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW WHERE LOWER(TOKEN_NAME)= LOWER('QuantixAI').
         - If user question or conversation history has refers to the token in all capital letters, then use TOKEN_SYMBOL in SELECT.
          </rules>
 
@@ -611,7 +598,7 @@ export class TwitterInteractionClient {
 
         ## Conversation Context
         ${formattedConversation}
-            `,
+        `,
         });
 
         function extractQuestionFromTweet(

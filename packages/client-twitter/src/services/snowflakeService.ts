@@ -1,5 +1,5 @@
-import { createPool, Pool } from 'generic-pool';
-import snowflake from 'snowflake-sdk';
+import { createPool, Pool } from "generic-pool";
+import snowflake from "snowflake-sdk";
 import { elizaLogger } from "@ai16z/eliza";
 
 export interface SnowflakeConfig {
@@ -15,42 +15,48 @@ export class SnowflakeService {
     private pool: Pool<snowflake.Connection>;
 
     constructor(config: SnowflakeConfig) {
-        this.pool = createPool({
-            create: async () => {
-                return new Promise((resolve, reject) => {
-                    const connection = snowflake.createConnection({
-                        account: config.account,
-                        username: config.username,
-                        password: config.password,
-                        database: config.database,
-                        schema: config.schema,
-                        warehouse: config.warehouse
-                    });
+        this.pool = createPool(
+            {
+                create: async () => {
+                    return new Promise((resolve, reject) => {
+                        const connection = snowflake.createConnection({
+                            account: config.account,
+                            username: config.username,
+                            password: config.password,
+                            database: config.database,
+                            schema: config.schema,
+                            warehouse: config.warehouse,
+                        });
 
-                    connection.connect((err, conn) => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            resolve(conn);
-                        }
+                        connection.connect((err, conn) => {
+                            if (err) {
+                                reject(err);
+                            } else {
+                                resolve(conn);
+                            }
+                        });
                     });
-                });
+                },
+                destroy: async (connection) => {
+                    return new Promise((resolve) => {
+                        connection.destroy((err) => {
+                            if (err) {
+                                elizaLogger.error(
+                                    "Error destroying connection:",
+                                    err
+                                );
+                            }
+                            resolve();
+                        });
+                    });
+                },
             },
-            destroy: async (connection) => {
-                return new Promise((resolve) => {
-                    connection.destroy((err) => {
-                        if (err) {
-                            elizaLogger.error('Error destroying connection:', err);
-                        }
-                        resolve();
-                    });
-                });
+            {
+                min: 0,
+                max: 5,
+                acquireTimeoutMillis: 30000,
             }
-        }, {
-            min: 0,
-            max: 5,
-            acquireTimeoutMillis: 30000
-        });
+        );
     }
 
     async query<T>(sql: string): Promise<T[]> {
@@ -66,7 +72,7 @@ export class SnowflakeService {
                         } else {
                             resolve(rows as T[]);
                         }
-                    }
+                    },
                 });
             });
         } finally {

@@ -9,22 +9,61 @@ import {
     type UUID,
     Participant,
     Room,
+    IDatabaseCacheAdapter,
 } from "@ai16z/eliza";
 import { DatabaseAdapter } from "@ai16z/eliza";
 import { v4 as uuid } from "uuid";
-export class SupabaseDatabaseAdapter extends DatabaseAdapter {
+
+function pickMemoriesTable(embeddingLength: number): string {
+    if (embeddingLength === 384) return "memories_384";
+    if (embeddingLength === 1024) return "memories_1024";
+    if (embeddingLength === 1536) return "memories_1536";
+    throw new Error(
+        `Unsupported embedding dimension: ${embeddingLength}. Expected one of 384, 1024, or 1536.`
+    );
+}
+
+export class SupabaseDatabaseAdapter
+    extends DatabaseAdapter
+    implements IDatabaseCacheAdapter
+{
     async getRoom(roomId: UUID): Promise<UUID | null> {
-        const { data, error } = await this.supabase
-            .from("rooms")
-            .select("id")
-            .eq("id", roomId)
-            .single();
+        console.log("DEBUG: Running new getRoom implementation");
+        try {
+            console.log("Getting room with ID:", roomId);
 
-        if (error) {
-            throw new Error(`Error getting room: ${error.message}`);
+            const { data, error } = await this.supabase
+                .from("rooms")
+                .select("id")
+                .eq("id", roomId)
+                .maybeSingle();
+
+            if (error) {
+                console.error("Error getting room:", {
+                    error,
+                    roomId,
+                    errorMessage: error.message,
+                    errorDetails: error.details,
+                });
+                return null;
+            }
+
+            console.log("Room query result:", {
+                roomId,
+                found: !!data,
+                data,
+            });
+
+            return data ? (data.id as UUID) : null;
+        } catch (error) {
+            console.error("Unexpected error getting room:", {
+                error,
+                roomId,
+                errorMessage:
+                    error instanceof Error ? error.message : String(error),
+            });
+            return null;
         }
-
-        return data ? (data.id as UUID) : null;
     }
 
     async getParticipantsForAccount(userId: UUID): Promise<Participant[]> {
@@ -234,7 +273,9 @@ export class SupabaseDatabaseAdapter extends DatabaseAdapter {
             levenshtein_score: number;
         }[]
     > {
+        console.log("Getting cached embeddings with opts:", opts);
         const result = await this.supabase.rpc("get_embedding_list", opts);
+        console.log("Result:", result);
         if (result.error) {
             throw new Error(JSON.stringify(result.error));
         }
@@ -348,18 +389,35 @@ export class SupabaseDatabaseAdapter extends DatabaseAdapter {
     }
 
     async getMemoryById(memoryId: UUID): Promise<Memory | null> {
-        const { data, error } = await this.supabase
-            .from("memories")
-            .select("*")
-            .eq("id", memoryId)
-            .single();
+        try {
+            console.log("Getting memory with ID:", memoryId);
 
-        if (error) {
-            console.error("Error retrieving memory by ID:", error);
+            const { data, error } = await this.supabase
+                .from("memories")
+                .select("*")
+                .eq("id", memoryId)
+                .maybeSingle();
+
+            if (error) {
+                console.error("Error retrieving memory by ID:", {
+                    error,
+                    memoryId,
+                    errorMessage: error.message,
+                    errorDetails: error.details,
+                });
+                return null;
+            }
+
+            return data as Memory;
+        } catch (error) {
+            console.error("Unexpected error retrieving memory:", {
+                error,
+                memoryId,
+                errorMessage:
+                    error instanceof Error ? error.message : String(error),
+            });
             return null;
         }
-
-        return data as Memory;
     }
 
     async createMemory(
@@ -367,35 +425,76 @@ export class SupabaseDatabaseAdapter extends DatabaseAdapter {
         tableName: string,
         unique = false
     ): Promise<void> {
-        const createdAt = memory.createdAt ?? Date.now();
-        if (unique) {
-            const opts = {
-                // TODO: Add ID option, optionally
-                query_table_name: tableName,
-                query_userId: memory.userId,
-                query_content: memory.content.text,
-                query_roomId: memory.roomId,
-                query_embedding: memory.embedding,
-                query_createdAt: createdAt,
-                similarity_threshold: 0.95,
-            };
+        try {
+            const embeddingDim = memory.embedding?.length ?? 0;
+            const dimensionTable = pickMemoriesTable(embeddingDim);
 
-            const result = await this.supabase.rpc(
-                "check_similarity_and_insert",
-                opts
-            );
+            const createdAt = memory.createdAt
+                ? new Date(memory.createdAt).toISOString()
+                : new Date().toISOString();
 
-            if (result.error) {
-                throw new Error(JSON.stringify(result.error));
+            if (unique) {
+                const opts = {
+                    query_table_name: dimensionTable,
+                    query_userId: memory.userId,
+                    query_content: memory.content.text,
+                    query_roomId: memory.roomId,
+                    query_embedding: memory.embedding,
+                    query_createdAt: createdAt,
+                    similarity_threshold: 0.95,
+                };
+
+                console.log(
+                    "Checking similarity and inserting with opts:",
+                    opts
+                );
+
+                const result = await this.supabase.rpc(
+                    "check_similarity_and_insert",
+                    opts
+                );
+
+                if (result.error) {
+                    console.error("Error in check_similarity_and_insert:", {
+                        error: result.error,
+                        memoryId: memory.id,
+                        tableName: dimensionTable,
+                    });
+                    throw new Error(JSON.stringify(result.error));
+                }
+
+                console.log("Successfully inserted unique memory:", memory.id);
+            } else {
+                console.log("Inserting non-unique memory:", {
+                    memoryId: memory.id,
+                    tableName: dimensionTable,
+                });
+
+                const result = await this.supabase.from(dimensionTable).insert({
+                    ...memory,
+                    createdAt: createdAt,
+                    type: tableName,
+                });
+
+                if (result.error) {
+                    console.error("Error inserting memory:", {
+                        error: result.error,
+                        memoryId: memory.id,
+                        tableName: dimensionTable,
+                    });
+                    throw new Error(JSON.stringify(result.error));
+                }
+
+                console.log("Successfully inserted memory:", memory.id);
             }
-        } else {
-            const result = await this.supabase
-                .from("memories")
-                .insert({ ...memory, createdAt, type: tableName });
-            const { error } = result;
-            if (error) {
-                throw new Error(JSON.stringify(error));
-            }
+        } catch (error) {
+            console.error("Unexpected error creating memory:", {
+                error,
+                memoryId: memory.id,
+                errorMessage:
+                    error instanceof Error ? error.message : String(error),
+            });
+            throw error;
         }
     }
 
@@ -538,7 +637,7 @@ export class SupabaseDatabaseAdapter extends DatabaseAdapter {
     async createRoom(roomId?: UUID): Promise<UUID> {
         roomId = roomId ?? (uuid() as UUID);
         const { data, error } = await this.supabase.rpc("create_room", {
-            roomId,
+            roomid: roomId,
         });
 
         if (error) {
@@ -679,5 +778,81 @@ export class SupabaseDatabaseAdapter extends DatabaseAdapter {
         }
 
         return data as Relationship[];
+    }
+
+    async getCache(params: {
+        key: string;
+        agentId: UUID;
+    }): Promise<string | undefined> {
+        try {
+            const { data, error } = await this.supabase
+                .from("cache")
+                .select("value")
+                .eq("key", params.key)
+                .eq("agentId", params.agentId)
+                .single();
+
+            if (error) {
+                if (error.code === "PGRST116") {
+                    // No rows found
+                    return undefined;
+                }
+                console.error("Error in getCache:", error);
+                return undefined;
+            }
+
+            return data?.value;
+        } catch (error) {
+            console.error("Unexpected error in getCache:", error);
+            return undefined;
+        }
+    }
+
+    async setCache(params: {
+        key: string;
+        agentId: UUID;
+        value: string;
+        expiresAt?: Date;
+    }): Promise<boolean> {
+        try {
+            const { error } = await this.supabase.from("cache").upsert({
+                key: params.key,
+                agentId: params.agentId,
+                value: params.value,
+                createdAt: new Date().toISOString(),
+                expiresAt: params.expiresAt?.toISOString(),
+            });
+
+            if (error) {
+                console.error("Error in setCache:", error);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error("Unexpected error in setCache:", error);
+            return false;
+        }
+    }
+
+    async deleteCache(params: {
+        key: string;
+        agentId: UUID;
+    }): Promise<boolean> {
+        try {
+            const { error } = await this.supabase
+                .from("cache")
+                .delete()
+                .eq("key", params.key)
+                .eq("agentId", params.agentId);
+
+            if (error) {
+                console.error("Error in deleteCache:", error);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error("Unexpected error in deleteCache:", error);
+            return false;
+        }
     }
 }

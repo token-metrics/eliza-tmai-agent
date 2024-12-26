@@ -311,35 +311,36 @@ export function getTokenForProvider(
 }
 
 function initializeDatabase(dataDir: string) {
-    if (process.env.POSTGRES_URL) {
-        elizaLogger.info("Initializing PostgreSQL connection...");
-        const db = new PostgresDatabaseAdapter({
-            connectionString: process.env.POSTGRES_URL,
-            parseInputs: true,
-        });
+    // if (process.env.POSTGRES_URL) {
+    //     elizaLogger.info("Initializing PostgreSQL connection...");
+    //     const db = new PostgresDatabaseAdapter({
+    //         connectionString: process.env.POSTGRES_URL,
+    //         parseInputs: true,
+    //     });
 
-        // Test the connection
-        db.init()
-            .then(() => {
-                elizaLogger.success(
-                    "Successfully connected to PostgreSQL database"
-                );
-            })
-            .catch((error) => {
-                elizaLogger.error("Failed to connect to PostgreSQL:", error);
-            });
+    //     // Test the connection
+    //     db.init()
+    //         .then(() => {
+    //             elizaLogger.success(
+    //                 "Successfully connected to PostgreSQL database"
+    //             );
+    //         })
+    //         .catch((error) => {
+    //             elizaLogger.error("Failed to connect to PostgreSQL:", error);
+    //         });
+
+    //     return db;
+    if (false) {
+        // if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+        elizaLogger.info("Initializing Supabase connection...");
+        const db = new SupabaseDatabaseAdapter(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_KEY
+        );
+
+        elizaLogger.info("Supabase database initialized");
 
         return db;
-        // if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
-        //     elizaLogger.info("Initializing Supabase connection...");
-        //     const db = new SupabaseDatabaseAdapter(
-        //         process.env.SUPABASE_URL,
-        //         process.env.SUPABASE_KEY
-        //     );
-
-        //     elizaLogger.info("Supabase database initialized");
-
-        //     return db;
     } else {
         const filePath =
             process.env.SQLITE_FILE ?? path.resolve(dataDir, "db.sqlite");

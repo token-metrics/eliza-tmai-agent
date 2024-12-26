@@ -210,8 +210,6 @@ export class TwitterPostClient {
             account: runtime.getSetting("SNOWFLAKE_ACCOUNT"),
             username: runtime.getSetting("SNOWFLAKE_USERNAME"),
             password: runtime.getSetting("SNOWFLAKE_PASSWORD"),
-            database: runtime.getSetting("SNOWFLAKE_DATABASE"),
-            schema: runtime.getSetting("SNOWFLAKE_SCHEMA"),
             warehouse: runtime.getSetting("SNOWFLAKE_WAREHOUSE"),
         };
         const redisConfig: RedisConfig = {
@@ -864,8 +862,8 @@ export class TwitterPostClient {
             const tweetTypes = [
                 'marketTopPerformers',
                 'marketRecentlyTurnedBullish',
-                'marketSignalChange',
-                'marketBitcoinVsAltcoin',
+                // 'marketSignalChange',
+                // 'marketBitcoinVsAltcoin',
                 'marketTopGainersInEachSector',
                 'ratingsTopTokensWith1MillionHourlyVolume',
                 'indicesNewTokens',
@@ -874,6 +872,9 @@ export class TwitterPostClient {
             const lastTweetTypeIndex = await this.redisService.get(lastTweetTypeKey)
             const currentTweetTypeIndex = lastTweetTypeIndex ? (parseInt(lastTweetTypeIndex) + 1) % tweetTypes.length : 0
             const currentTweetType = tweetTypes[currentTweetTypeIndex]
+
+            console.log('currentTweetType', currentTweetType)
+
             let prompt = ''
             let prevData: any;
             let data: any;
@@ -883,6 +884,8 @@ export class TwitterPostClient {
                     [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketTopPerformers'), this.snowflakeService.getDailyTopPerformers()])
 
                     if (JSON.stringify(data) === prevData || !data.length) return
+
+                    console.log('tweet data', data)
 
                     await this.redisService.set('tmaiAgent_marketTopPerformers', JSON.stringify(data))
 
@@ -897,6 +900,8 @@ export class TwitterPostClient {
 
                     if (JSON.stringify(data) === prevData || !data.length) return
 
+                    console.log('tweet data', data)
+
                     await this.redisService.set('tmaiAgent_marketRecentlyTurnedBullish', JSON.stringify(data))
 
                     prompt = `
@@ -905,36 +910,38 @@ export class TwitterPostClient {
                     </data>
                     `
                     break;
-                case 'marketSignalChange':
-                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketSignalChange'), this.snowflakeService.getMarketMetrics()])
+                // case 'marketSignalChange':
+                //     [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketSignalChange'), this.snowflakeService.getMarketMetrics()])
 
-                    if (JSON.stringify(data) === prevData || !data.length) return
+                //     if (JSON.stringify(data) === prevData || !data.length) return
 
-                    await this.redisService.set('tmaiAgent_marketSignalChange', JSON.stringify(data))
+                //     await this.redisService.set('tmaiAgent_marketSignalChange', JSON.stringify(data))
 
-                    prompt = `
-                    <data>
-                    ${JSON.stringify(data, null, 2)}
-                    </data>
-                    `
-                    break;
-                case 'marketBitcoinVsAltcoin':
-                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketBitcoinVsAltcoin'), this.snowflakeService.getMarketMetrics()])
+                //     prompt = `
+                //     <data>
+                //     ${JSON.stringify(data, null, 2)}
+                //     </data>
+                //     `
+                //     break;
+                // case 'marketBitcoinVsAltcoin':
+                //     [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketBitcoinVsAltcoin'), this.snowflakeService.getMarketMetrics()])
 
-                    if (JSON.stringify(data) === prevData || !data.length) return
+                //     if (JSON.stringify(data) === prevData || !data.length) return
 
-                    await this.redisService.set('tmaiAgent_marketBitcoinVsAltcoin', JSON.stringify(data))
+                //     await this.redisService.set('tmaiAgent_marketBitcoinVsAltcoin', JSON.stringify(data))
 
-                    prompt = `
-                    <data>
-                    ${JSON.stringify(data, null, 2)}
-                    </data>
-                    `
-                    break;
+                //     prompt = `
+                //     <data>
+                //     ${JSON.stringify(data, null, 2)}
+                //     </data>
+                //     `
+                //     break;
                 case 'marketTopGainersInEachSector':
                     [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketTopGainersInEachSector'), this.snowflakeService.getSectorAnalysis()])
 
                     if (JSON.stringify(data) === prevData || !data.length) return
+
+                    console.log('tweet data', data)
 
                     await this.redisService.set('tmaiAgent_marketTopGainersInEachSector', JSON.stringify(data))
 
@@ -949,6 +956,8 @@ export class TwitterPostClient {
 
                     if (JSON.stringify(data) === prevData || !data.length) return
 
+                    console.log('tweet data', data)
+
                     await this.redisService.set('tmaiAgent_ratingsTopTokensWith1MillionHourlyVolume', JSON.stringify(data))
 
                     prompt = `
@@ -961,6 +970,8 @@ export class TwitterPostClient {
                     [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_indicesNewTokens'), this.snowflakeService.getIndicesNewTokens()])
 
                     if (JSON.stringify(data) === prevData || !data.length) return
+
+                    console.log('tweet data', data)
 
                     await this.redisService.set('tmaiAgent_indicesNewTokens', JSON.stringify(data))
 
@@ -975,6 +986,8 @@ export class TwitterPostClient {
 
                     if (JSON.stringify(data) === prevData || !data.length) return
 
+                    console.log('tweet data', data)
+
                     await this.redisService.set('tmaiAgent_indicesTokensWithHighestHoldings', JSON.stringify(data))
 
                     prompt = `
@@ -986,7 +999,7 @@ export class TwitterPostClient {
             }
 
             // Fetch token metrics data
-            const tokenData = await this.snowflakeService.getTokenMetrics();
+            // const tokenData = await this.snowflakeService.getTokenMetrics();
 
             // Analyze the data
             // const analysis = this.dataAnalysisService.analyzeTokenData(tokenData);
@@ -995,11 +1008,11 @@ export class TwitterPostClient {
             const oldPrompt = `
             You are TM-AI-Agent, a crypto twitter bot which posts regular updates about crypto markets, news, analysis etc.
             Create a short tweet considering the data below:
-            ${JSON.stringify(tokenData, null, 2)}
+            ${JSON.stringify(data, null, 2)}
 
             ## Instructions
             Write in the style of a professional yet relatable Crypto Twitter insider with INTJ-level strategic depth. Posts should deliver actionable alpha for traders and investors, balancing short-term opportunities with long-term plays.
-            Each tweet must:
+            # Each tweet must:
             - Be Substantiated by Data: Include specific metrics, indicators, or evidence to support claims, such as TVL, growth rates, funding activity, or historical trends.
             - Demonstrate Strategic Depth: Go beyond surface-level takes to showcase second-level thinking, considering long-term narratives and broader market forces.
             - Provide Clear Calls to Action: Include actionable insights, such as specific tokens, projects, or frameworks for decision-making.
@@ -1008,7 +1021,7 @@ export class TwitterPostClient {
             - Every answer should provide clarity, depth, and tangible opportunities while maintaining relevance to market conditions.
             - Do not include hashtags at all, use cashtags for token names.
             - Always formulate the answer in less than 280 characters for twitter.
-            Here are 10 examples of tweets:
+            # Here are 10 examples of tweets:
             1. "ETH staking has grown to $42B TVL, but decentralization matters. Rocket Pool ($ROCKET) offers ~4.3% APY with less regulatory risk, while Obol is innovating distributed validator tech. Balance yields with resilience—don’t overconcentrate in Lido. :shield::gem:"
             2. "Bitcoin is at $100K, but miners are the lagging alpha. $RIOT and $MARA historically rally 2-3 weeks after BTC pumps. Key signal: BTC DEVuction costs (~$20K). Miners with high hashrate efficiency often double in these conditions. :hammer_and_pick::chart_with_upwards_trend:"
             3. "zkEVM is hyped, but dev infra is where value sticks. $SAFE secures 40% of DAO multi-sigs, and EigenLayer ($EIGEN) is redefining data availability with $50M backing. Builders need tools—follow the funding and activity metrics. :hammer_and_wrench::rocket:"
@@ -1019,12 +1032,28 @@ export class TwitterPostClient {
             8. "AI x blockchain isnt just hype—its infrastructure. Akash ($AKT) processes 10K+ decentralized workloads daily, and Ocean Protocol ($OCEAN) leads data markets with $25M+ staked. Verified, decentralized compute is critical for scalable AI. :brain::robot_face:"
             9. "BTC dominance nearing 50% signals altcoin rotations. Historically, $DOT and $ATOM outperform in these cycles, with $ATOM up 60% post-dominance peaks. Key triggers: funding rate flips (negative to positive) and sentiment spikes. :mantelpiece_clock::gem:"
             10. "Bear markets are for positioning. Middleware projects like Axelar ($AXL) handle $2B+ in cross-chain liquidity, while EigenLayer ($EIGEN) is building the backbone for modular scaling. Execution > hype—invest in infrastructure while its undervalued. :tractor::package:"
-            Why These Examples Work:
+            # Why These Examples Work:
             - Substantiated by Data: Every example includes metrics, trends, or historical references to validate the insights (e.g., TVL, hashrate efficiency, transaction volumes).
             - Strategic Depth: Goes beyond the obvious, offering second-order thinking about ecosystems, infrastructure, and emerging narratives.
             - Actionable: Provides clear tokens, signals, or metrics to research and act upon.
             - Avoids Hype: Focuses on sustainable, data-backed trends rather than speculative narratives.
             - Engaging Tone: Smart, professional, but approachable and clear for traders and investors.
+            # Response Rules
+            1. If no data available: State this clearly and ask a follow-up question.
+            2. Use only provided data, no external knowledge.
+            3. Write naturally, conversationally.
+            4. Respond as Token Metrics.
+            5. Use TRADER_GRADE_SIGNAL (strong buy, buy, neutral, sell, strong sell) instead of percentages.
+            6. For grades: Above 80 = strong buy/very good, 60-80 = buy/good. MUST NOT show exact numbers.
+            7. Don't reference data source
+            8. Format signals: 1 = bullish, -1 = bearish
+            9. Always keep the replies under 280 characters.
+            10. Format the answer like a tweet.
+            11. Do not use parentheses around cashtags, always use $ symbol with token symbol.
+            12. Give actionable alpha rather than a data dump. Dive into second order analysis.
+            13. Keeping in mind the conversation history and user question, also mention liquidity metrics, or holder profiles, or technical analysis metrics, or any other information you deem necessary.
+            15. Must not use $ symbol for referencing the same token symbol more than once.
+            16. Add a new line between the paragraphs.
             Never select token names on your own.
             Only use the provided data.
             `;
@@ -1067,6 +1096,7 @@ export class TwitterPostClient {
             const cleanedTweet = generatedTweet
                 .replace(/```json\s*|\s*```/g, "") // Remove JSON markers
                 .replace(/^['"](.*)['"]$/g, "$1") // Remove quotes
+                .replace(/\$([a-zA-Z]{7,})/g, '#$1') // Replace dollar signs with hash tags if they have at least 7 characters after them
                 .replace(/\\n/g, "\n") // Handle newlines
                 .trim();
 

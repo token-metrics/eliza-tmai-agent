@@ -16,6 +16,7 @@ import { IImageDescriptionService, ServiceType } from "@ai16z/eliza";
 import { buildConversationThread } from "./utils.ts";
 import { twitterMessageHandlerTemplate } from "./interactions.ts";
 import { SnowflakeService, SnowflakeConfig } from "./services/snowflakeService";
+import { RedisService, RedisConfig } from "./services/redisService";
 import {
     DataAnalysisService,
     TokenMetrics,
@@ -105,6 +106,7 @@ export class TwitterPostClient {
     private lastProcessTime: number = 0;
     private stopProcessingActions: boolean = false;
     private snowflakeService: SnowflakeService;
+    private redisService: RedisService;
     private dataAnalysisService: DataAnalysisService;
 
     async start(postImmediately: boolean = false) {
@@ -212,9 +214,15 @@ export class TwitterPostClient {
             schema: runtime.getSetting("SNOWFLAKE_SCHEMA"),
             warehouse: runtime.getSetting("SNOWFLAKE_WAREHOUSE"),
         };
+        const redisConfig: RedisConfig = {
+            host: runtime.getSetting("REDIS_HOST"),
+            port: parseInt(runtime.getSetting("REDIS_PORT") || "6379"),
+            password: runtime.getSetting("REDIS_PASSWORD"),
+        };
 
         this.snowflakeService = new SnowflakeService(snowflakeConfig);
         this.dataAnalysisService = new DataAnalysisService();
+        this.redisService = new RedisService(redisConfig);
     }
 
     private async generateNewTweet() {
@@ -223,6 +231,11 @@ export class TwitterPostClient {
         try {
             // Generate data-driven content
             const newTweetContent = await this.generateDataDrivenTweet();
+
+            if (!newTweetContent) {
+                elizaLogger.error("No new tweet content generated");
+                return;
+            }
 
             // First attempt to clean content
             let cleanedContent = "";
@@ -803,7 +816,7 @@ export class TwitterPostClient {
                 template:
                     this.runtime.character.templates
                         ?.twitterMessageHandlerTemplate ||
-                    twitterMessageHandlerTemplate,
+                    twitterMessageHandlerTemplate(),
             });
 
             if (!replyText) {
@@ -847,6 +860,131 @@ export class TwitterPostClient {
 
     private async generateDataDrivenTweet(): Promise<string> {
         try {
+            const lastTweetTypeKey = 'tmaiAgent_lastTweetTypeIndex'
+            const tweetTypes = [
+                'marketTopPerformers',
+                'marketRecentlyTurnedBullish',
+                'marketSignalChange',
+                'marketBitcoinVsAltcoin',
+                'marketTopGainersInEachSector',
+                'ratingsTopTokensWith1MillionHourlyVolume',
+                'indicesNewTokens',
+                'indicesTokensWithHighestHoldings'
+            ]
+            const lastTweetTypeIndex = await this.redisService.get(lastTweetTypeKey)
+            const currentTweetTypeIndex = lastTweetTypeIndex ? (parseInt(lastTweetTypeIndex) + 1) % tweetTypes.length : 0
+            const currentTweetType = tweetTypes[currentTweetTypeIndex]
+            let prompt = ''
+            let prevData: any;
+            let data: any;
+
+            switch (currentTweetType) {
+                case 'marketTopPerformers':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketTopPerformers'), this.snowflakeService.getDailyTopPerformers()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_marketTopPerformers', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'marketRecentlyTurnedBullish':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketRecentlyTurnedBullish'), this.snowflakeService.getRecentlyTurnedBullish()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_marketRecentlyTurnedBullish', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'marketSignalChange':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketSignalChange'), this.snowflakeService.getMarketMetrics()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_marketSignalChange', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'marketBitcoinVsAltcoin':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketBitcoinVsAltcoin'), this.snowflakeService.getMarketMetrics()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_marketBitcoinVsAltcoin', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'marketTopGainersInEachSector':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_marketTopGainersInEachSector'), this.snowflakeService.getSectorAnalysis()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_marketTopGainersInEachSector', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'ratingsTopTokensWith1MillionHourlyVolume':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_ratingsTopTokensWith1MillionHourlyVolume'), this.snowflakeService.getTopTokensWith1MVolume()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_ratingsTopTokensWith1MillionHourlyVolume', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'indicesNewTokens':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_indicesNewTokens'), this.snowflakeService.getIndicesNewTokens()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_indicesNewTokens', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+                case 'indicesTokensWithHighestHoldings':
+                    [prevData, data] = await Promise.all([this.redisService.get('tmaiAgent_indicesTokensWithHighestHoldings'), this.snowflakeService.getIndicesTokensWithHighestHoldings()])
+
+                    if (JSON.stringify(data) === prevData || !data.length) return
+
+                    await this.redisService.set('tmaiAgent_indicesTokensWithHighestHoldings', JSON.stringify(data))
+
+                    prompt = `
+                    <data>
+                    ${JSON.stringify(data, null, 2)}
+                    </data>
+                    `
+                    break;
+            }
+
             // Fetch token metrics data
             const tokenData = await this.snowflakeService.getTokenMetrics();
 
@@ -854,7 +992,7 @@ export class TwitterPostClient {
             // const analysis = this.dataAnalysisService.analyzeTokenData(tokenData);
 
             // Create a prompt for the LLM
-            const prompt = `
+            const oldPrompt = `
             You are TM-AI-Agent, a crypto twitter bot which posts regular updates about crypto markets, news, analysis etc.
             Create a short tweet considering the data below:
             ${JSON.stringify(tokenData, null, 2)}
@@ -913,14 +1051,17 @@ export class TwitterPostClient {
             // Generate tweet using LLM
             const context = composeContext({
                 state,
-                template: prompt,
+                template: oldPrompt,
             });
 
-            const generatedTweet = await generateText({
-                runtime: this.runtime,
-                context,
-                modelClass: ModelClass.LARGE,
-            });
+            const [generatedTweet] = await Promise.all([
+                generateText({
+                    runtime: this.runtime,
+                    context,
+                    modelClass: ModelClass.LARGE,
+                }),
+                this.redisService.set(lastTweetTypeKey, currentTweetTypeIndex.toString())
+            ])
 
             // Clean up the generated tweet
             const cleanedTweet = generatedTweet

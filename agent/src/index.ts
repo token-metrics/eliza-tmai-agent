@@ -1,5 +1,6 @@
 import { PostgresDatabaseAdapter } from "@ai16z/adapter-postgres";
 import { SqliteDatabaseAdapter } from "@ai16z/adapter-sqlite";
+import { SupabaseDatabaseAdapter } from "@ai16z/adapter-supabase";
 import { AutoClientInterface } from "@ai16z/client-auto";
 import { DiscordClientInterface } from "@ai16z/client-discord";
 import { FarcasterAgentClient } from "@ai16z/client-farcaster";
@@ -329,6 +330,16 @@ function initializeDatabase(dataDir: string) {
             });
 
         return db;
+        // if (process.env.SUPABASE_URL && process.env.SUPABASE_KEY) {
+        //     elizaLogger.info("Initializing Supabase connection...");
+        //     const db = new SupabaseDatabaseAdapter(
+        //         process.env.SUPABASE_URL,
+        //         process.env.SUPABASE_KEY
+        //     );
+
+        //     elizaLogger.info("Supabase database initialized");
+
+        //     return db;
     } else {
         const filePath =
             process.env.SQLITE_FILE ?? path.resolve(dataDir, "db.sqlite");
@@ -650,9 +661,9 @@ const startAgents = async () => {
     }
 
     // upload some agent functionality into directClient
-    directClient.startAgent = async character => {
-      // wrap it so we don't have to inject directClient later
-      return startAgent(character, directClient)
+    directClient.startAgent = async (character) => {
+        // wrap it so we don't have to inject directClient later
+        return startAgent(character, directClient);
     };
     directClient.start(serverPort);
 

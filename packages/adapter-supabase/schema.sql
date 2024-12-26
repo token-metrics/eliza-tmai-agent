@@ -144,4 +144,34 @@ CREATE INDEX idx_participants_user ON participants("userId");
 CREATE INDEX idx_participants_room ON participants("roomId");
 CREATE INDEX idx_relationships_users ON relationships("userA", "userB");
 
+-- Add this after your table definitions
+CREATE OR REPLACE FUNCTION public.create_room(roomId UUID DEFAULT NULL)
+RETURNS TABLE (id UUID) AS $$
+DECLARE
+    new_room_id UUID;
+BEGIN
+    IF roomId IS NULL THEN
+        new_room_id := gen_random_uuid();
+    ELSE
+        new_room_id := roomId;
+    END IF;
+
+    INSERT INTO rooms (id) VALUES (new_room_id)
+    RETURNING id INTO new_room_id;
+
+    RETURN QUERY SELECT new_room_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS cache (
+    "key" TEXT NOT NULL,
+    "agentId" UUID NOT NULL,
+    "value" TEXT NOT NULL,
+    "createdAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMPTZ,
+    PRIMARY KEY ("key", "agentId")
+);
+
+CREATE INDEX idx_cache_expiry ON cache("expiresAt");
+
 COMMIT;

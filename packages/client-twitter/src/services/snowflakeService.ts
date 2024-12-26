@@ -6,8 +6,6 @@ export interface SnowflakeConfig {
     account: string;
     username: string;
     password: string;
-    database: string;
-    schema: string;
     warehouse: string;
 }
 
@@ -29,8 +27,6 @@ export class SnowflakeService {
                             account: config.account,
                             username: config.username,
                             password: config.password,
-                            database: config.database,
-                            schema: config.schema,
                             warehouse: config.warehouse,
                         });
 

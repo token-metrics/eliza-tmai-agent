@@ -22,7 +22,7 @@ import { SnowflakeConfig } from "./services/snowflakeService.ts";
 import { SnowflakeService } from "./services/snowflakeService.ts";
 import { generateSQLQueryTemplate } from "./templates/sqlQueryTemplate";
 
-export const twitterMessageHandlerTemplate = (data: any) =>
+export const twitterMessageHandlerTemplate = (data?: any) =>
     `
 # Areas of Expertise
 {{knowledge}}

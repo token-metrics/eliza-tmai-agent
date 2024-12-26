@@ -134,6 +134,14 @@ export const generateSQLQueryTemplate = ({
         </example>
 
         <example>
+        Question: What is the price prediction for bitcoin?
+        Thought: Get price prediction for Bitcoin, use the SCENARIO_ANALYSIS column
+        Output: SELECT SCENARIO_ANALYSIS FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
+                    WHERE LOWER(TOKEN_NAME) = LOWER('Bitcoin')
+                    LIMIT 1;
+        </example>
+
+        <example>
         Question: Give me data about DOGE
         Thought: Get data about the token with symbol DOGE
         Output: SELECT * FROM TOKENMETRICS_DEV.ANALYTICS.CRYPTO_INFO_HUB_CURRENT_VIEW
